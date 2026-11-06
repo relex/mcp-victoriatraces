@@ -1,0 +1,76 @@
+package tools
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/mark3labs/mcp-go/server"
+
+	"github.com/VictoriaMetrics-Community/mcp-victoriatraces/cmd/mcp-victoriatraces/config"
+)
+
+const toolNameStatsQuery = "stats_query"
+
+var (
+	toolStatsQuery = mcp.NewTool(toolNameStatsQuery,
+		mcp.WithDescription("Span stats for the given query at the given timestamp (time) in the format compatible with Prometheus querying API. This tool uses `/select/logsql/stats_query` endpoint of VictoriaTraces API."+spanFieldsHint),
+		mcp.WithToolAnnotation(mcp.ToolAnnotation{
+			Title:           "Querying span stats",
+			ReadOnlyHint:    ptr(true),
+			DestructiveHint: ptr(false),
+			OpenWorldHint:   ptr(true),
+		}),
+		mcp.WithString("tenant",
+			mcp.Title("Tenant name (Account ID and Project ID)"),
+			mcp.Description("Name of the tenant for which the data will be displayed (format AccountID:ProjectID)"),
+			mcp.DefaultString("0:0"),
+			mcp.Pattern(`^([0-9]+)(:[0-9]+)$`),
+		),
+		mcp.WithString("query",
+			mcp.Required(),
+			mcp.Title("LogsQL expression"),
+			mcp.Description(`LogsQL expression that must contain stats pipe. The calculated stats is converted into metrics with labels from by(...) clause of the | stats by(...) pipe.`),
+		),
+		mcp.WithString("time",
+			mcp.Title("Query time"),
+			mcp.Description("Time in RFC3339. If it's missing, then it equals to the current time."),
+			mcp.Pattern(timestampPattern),
+		),
+	)
+)
+
+func toolStatsQueryHandler(ctx context.Context, cfg *config.Config, tcr mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	query, err := GetToolReqParam[string](tcr, "query", true)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	time, err := GetToolReqParam[string](tcr, "time", false)
+	if err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	req, err := CreateLogsQLRequest(ctx, cfg, tcr, "stats_query")
+	if err != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to create request: %v", err)), nil
+	}
+
+	q := req.URL.Query()
+	q.Add("query", query)
+	if time != "" {
+		q.Add("time", time)
+	}
+	req.URL.RawQuery = q.Encode()
+
+	return GetTextBodyForRequest(req, cfg), nil
+}
+
+func RegisterToolStatsQuery(s *server.MCPServer, c *config.Config) {
+	if c.IsToolDisabled(toolNameStatsQuery) {
+		return
+	}
+	s.AddTool(toolStatsQuery, func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return toolStatsQueryHandler(ctx, c, request)
+	})
+}

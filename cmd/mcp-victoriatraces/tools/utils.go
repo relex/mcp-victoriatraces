@@ -13,15 +13,22 @@ import (
 	"github.com/VictoriaMetrics-Community/mcp-victoriatraces/cmd/mcp-victoriatraces/config"
 )
 
+// CreateSelectRequest creates a request to the Jaeger-compatible API (/select/jaeger/api/...).
 func CreateSelectRequest(ctx context.Context, cfg *config.Config, tcr mcp.CallToolRequest, path ...string) (*http.Request, error) {
+	selectURL := cfg.EntryPointURL().JoinPath("select", "jaeger", "api").JoinPath(path...).String()
+	return createTenantRequest(ctx, cfg, tcr, selectURL)
+}
+
+// CreateLogsQLRequest creates a request to the LogsQL API (/select/logsql/...).
+func CreateLogsQLRequest(ctx context.Context, cfg *config.Config, tcr mcp.CallToolRequest, path ...string) (*http.Request, error) {
+	selectURL := cfg.EntryPointURL().JoinPath("select", "logsql").JoinPath(path...).String()
+	return createTenantRequest(ctx, cfg, tcr, selectURL)
+}
+
+func createTenantRequest(ctx context.Context, cfg *config.Config, tcr mcp.CallToolRequest, selectURL string) (*http.Request, error) {
 	accountID, projectID, err := GetToolReqTenant(tcr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tenant: %v", err)
-	}
-
-	selectURL, err := getSelectURL(ctx, cfg, tcr, path...)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get select URL: %v", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, selectURL, nil)
@@ -79,10 +86,6 @@ func getRootURL(_ context.Context, cfg *config.Config, _ mcp.CallToolRequest, pa
 	return cfg.EntryPointURL().JoinPath(path...).String(), nil
 }
 
-func getSelectURL(_ context.Context, cfg *config.Config, _ mcp.CallToolRequest, path ...string) (string, error) {
-	return cfg.EntryPointURL().JoinPath("select", "jaeger", "api").JoinPath(path...).String(), nil
-}
-
 func GetTextBodyForRequest(req *http.Request, _ *config.Config) *mcp.CallToolResult {
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -137,3 +140,12 @@ func GetToolReqTenant(tcr mcp.CallToolRequest) (string, string, error) {
 func ptr[T any](v T) *T {
 	return &v
 }
+
+const (
+	// timestampPattern matches RFC3339 timestamps or unix timestamps.
+	timestampPattern = `^((?:(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2}(?:\.\d+)?))(Z|[\+-]\d{2}:\d{2})?)|([0-9]+)$`
+	// durationPattern matches LogsQL durations such as 5s or 1h.
+	durationPattern = `^([0-9]+)([a-z]+)$`
+	// spanFieldsHint describes how spans are stored, to help building LogsQL queries.
+	spanFieldsHint = " Every span is stored as a log entry with fields such as `trace_id`, `span_id`, `parent_span_id`, `name` (span name / operation), `kind`, `duration` (nanoseconds), `status_code`, `resource_attr:service.name`, `resource_attr:*` and `span_attr:*`. Use the `field_names` tool to discover available fields."
+)

@@ -94,6 +94,12 @@ Try not to second guess information - if you don't know something or lack inform
 	tools.RegisterToolDependencies(s, c)
 	tools.RegisterToolDocumentation(s, c)
 	tools.RegisterToolServiceOperations(s, c)
+	tools.RegisterToolQuery(s, c)
+	tools.RegisterToolStatsQuery(s, c)
+	tools.RegisterToolStatsQueryRange(s, c)
+	tools.RegisterToolHits(s, c)
+	tools.RegisterToolFieldNames(s, c)
+	tools.RegisterToolFieldValues(s, c)
 
 	prompts.RegisterPromptDocumentation(s, c)
 

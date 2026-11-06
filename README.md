@@ -354,14 +354,27 @@ MCP VictoriaTraces provides numerous tools for interacting with your VictoriaTra
 
 Here's a list of available tools:
 
-| Tool            | Description                                      |
-|-----------------|--------------------------------------------------|
-| `documentation` | Search in embedded VictoriaTraces documentation  |
-| `services`      | List of all traced services                      |
-| `service_names` | Get all the span names (operations) of a service |
-| `traces`        | Query traces                                     |
-| `trace`         | Get trace info by trace ID                       |
-| `dependencies`  | Query the service dependency graph               |
+| Tool                | Description                                                    |
+|---------------------|----------------------------------------------------------------|
+| `documentation`     | Search in embedded VictoriaTraces documentation                |
+| `services`          | List of all traced services                                    |
+| `service_names`     | Get all the span names (operations) of a service               |
+| `traces`            | Query traces                                                   |
+| `trace`             | Get trace info by trace ID                                     |
+| `dependencies`      | Query the service dependency graph                             |
+| `query`             | Search spans with a LogsQL query                               |
+| `stats_query`       | Span stats (counts, percentiles, ...) at a given time          |
+| `stats_query_range` | Span stats over a time range with a step interval              |
+| `hits`              | Number of matching spans grouped by time buckets and fields    |
+| `field_names`       | Span field names for a LogsQL query                            |
+| `field_values`      | Unique values of a span field for a LogsQL query               |
+
+The LogsQL tools (`query`, `stats_query`, `stats_query_range`, `hits`, `field_names`, `field_values`) use the `/select/logsql/*` endpoints
+and allow aggregations which are not possible with the Jaeger-compatible API, for example:
+
+```
+* | stats by (resource_attr:service.name, name) count() spans, quantile(0.99, duration) p99_ns, sum(duration) total_ns | sort by (total_ns desc) | limit 10
+```
 
 ### Prompts
 
